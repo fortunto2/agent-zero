@@ -63,14 +63,27 @@ rate_limiters: dict[str, RateLimiter] = {}
 
 # Utility function to get API keys from environment variables
 def get_api_key(service):
-    return (
-        dotenv.get_dotenv_value(f"API_KEY_{service.upper()}")
-        or dotenv.get_dotenv_value(f"{service.upper()}_API_KEY")
-        or dotenv.get_dotenv_value(
-            f"{service.upper()}_API_TOKEN"
-        )  # Added for CHUTES_API_TOKEN
-        or "None"
-    )
+    service_upper = service.upper()
+    candidates = [
+        f"API_KEY_{service_upper}",
+        f"{service_upper}_API_KEY",
+        f"{service_upper}_API_TOKEN",
+    ]
+    if "_" in service_upper:
+        parts = service_upper.split("_")
+        reversed_service = "_".join(reversed(parts))
+        candidates.extend(
+            [
+                f"API_KEY_{reversed_service}",
+                f"{reversed_service}_API_KEY",
+                f"{reversed_service}_API_TOKEN",
+            ]
+        )
+    for key in candidates:
+        value = dotenv.get_dotenv_value(key)
+        if value:
+            return value
+    return "None"
 
 
 def get_model(type: ModelType, provider: ModelProvider, name: str, **kwargs):
@@ -241,26 +254,58 @@ def get_openai_azure_chat(
     deployment_name: str,
     api_key=None,
     azure_endpoint=None,
+    api_version=None,
     **kwargs,
 ):
     if not api_key:
         api_key = get_api_key("openai_azure")
     if not azure_endpoint:
-        azure_endpoint = dotenv.get_dotenv_value("OPENAI_AZURE_ENDPOINT")
-    return AzureChatOpenAI(deployment_name=deployment_name, api_key=api_key, azure_endpoint=azure_endpoint, **kwargs)  # type: ignore
+        azure_endpoint = (
+            dotenv.get_dotenv_value("OPENAI_AZURE_ENDPOINT")
+            or dotenv.get_dotenv_value("AZURE_OPENAI_ENDPOINT")
+        )
+    if not api_version:
+        api_version = (
+            dotenv.get_dotenv_value("OPENAI_API_VERSION")
+            or dotenv.get_dotenv_value("AZURE_OPENAI_API_VERSION")
+            or dotenv.get_dotenv_value("OPENAI_AZURE_API_VERSION")
+        )
+    return AzureChatOpenAI(
+        deployment_name=deployment_name,
+        api_key=api_key,
+        azure_endpoint=azure_endpoint,
+        openai_api_version=api_version,
+        **kwargs,
+    )  # type: ignore
 
 
 def get_openai_azure_embedding(
     deployment_name: str,
     api_key=None,
     azure_endpoint=None,
+    api_version=None,
     **kwargs,
 ):
     if not api_key:
         api_key = get_api_key("openai_azure")
     if not azure_endpoint:
-        azure_endpoint = dotenv.get_dotenv_value("OPENAI_AZURE_ENDPOINT")
-    return AzureOpenAIEmbeddings(deployment_name=deployment_name, api_key=api_key, azure_endpoint=azure_endpoint, **kwargs)  # type: ignore
+        azure_endpoint = (
+            dotenv.get_dotenv_value("OPENAI_AZURE_ENDPOINT")
+            or dotenv.get_dotenv_value("AZURE_OPENAI_ENDPOINT")
+        )
+    if not api_version:
+        api_version = (
+            dotenv.get_dotenv_value("OPENAI_API_VERSION")
+            or dotenv.get_dotenv_value("AZURE_OPENAI_API_VERSION")
+            or dotenv.get_dotenv_value("OPENAI_AZURE_API_VERSION")
+        )
+    return AzureOpenAIEmbeddings(
+        deployment_name=deployment_name,
+        api_key=api_key,
+        azure_endpoint=azure_endpoint,
+        openai_api_version=api_version,
+        **kwargs,
+    )  # type: ignore
 
 
 # Google models
